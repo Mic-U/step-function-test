@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Create Step Function StateMachine"
+Resources:
+  InvokeLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: StepFunctionsAssumeRolePolicy
+              Effect: Allow
+              Principal:
+                Service:
+                  Fn::Join: [ ".", [ states, Ref: "AWS::Region", amazonaws, com ] ]
+              Action: sts:AssumeRole
+        Path: /
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+  TestStateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      RoleArn:
+        Fn::GetAtt: [ InvokeLambdaRole, Arn ]
+      DefinitionString: |-
+        {
+          "Comment": "An example of the Amazon States Language using wait states",
+          "StartAt": "FirstState",
+          "States": {
+            "FirstState": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:${self:provider.region}:${self:custom.config.accountId}:function:${self:service}-${self:custom.config.stage}-first",
+              "Next": "wait_using_seconds"
+            },
+            "wait_using_seconds": {
+              "Type": "Wait",
+              "Seconds": 10,
+              "Next": "FinalState"
+            },
+            "FinalState": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:${self:provider.region}:${self:custom.config.accountId}:function:${self:service}-${self:custom.config.stage}-second",
+              "End": true
+            }
+          }
+        }
+Outputs:
+  StateMachineArn:
+    Value:
+      Ref: TestStateMachine
+  StateMachineName:
+    Value:
+      Fn::GetAtt: [ TestStateMachine, Name ]
